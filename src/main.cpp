@@ -58,7 +58,7 @@ int userGuess[4][9];   // Масив кіл: secretCode + 9 спроб грав�
 int cursorX = 0;       // Позиція курсору по X (0-3)
 int cursorY = 1;       // Позиція курсору по Y (1-9)
 unsigned long lastMoveTime = 0;
-const int moveDelay = 200;
+const int moveDelay = 400;
 
 void drawBoard();         // малювання ігрового поля
 void generateSecretCode();// генерування паролю
@@ -97,13 +97,13 @@ void drawBoard() {
   tft.fillScreen(TFT_CYAN);
   tft.setCursor(0, 1);
   tft.setTextSize(2);
-  tft.setTextColor(TFT_NAVY);
+  tft.setTextColor(TFT_MAROON);
   tft.println("          Mastermind");
   tft.println("          by YarOK1");
 
   // Секретний код (верхній ряд)
   for (int i = 0; i < 4; i++) {
-    tft.fillCircle(START_X + CIRCLE_X_SPACING * i, START_Y, CIRCLE_RADIUS, TFT_NAVY);
+    tft.fillCircle(START_X + CIRCLE_X_SPACING * i, START_Y, CIRCLE_RADIUS, TFT_MAROON);
   }
 
   // Поле для спроб (9 рядів)
@@ -113,8 +113,8 @@ void drawBoard() {
 
       // Квадратики підказок праворуч від кожного ряду
       int hintX = HINT_X + CIRCLE_X_SPACING * i * 0.8;                  // X-координата верхнього лівого кута квадратиків підказок
-      int hintY = START_Y - CIRCLE_RADIUS + CIRCLE_Y_SPACING * j; // Y-координата верхнього лівого кута квадратиків підказок 
-      tft.fillRect(hintX, hintY, 20, 20, TFT_NAVY);
+      int hintY = START_Y - CIRCLE_RADIUS + CIRCLE_Y_SPACING * j + 1; // Y-координата верхнього лівого кута квадратиків підказок 
+      tft.fillRect(hintX, hintY, 20, 20, TFT_MAROON);
     }
   }
 }
@@ -174,8 +174,8 @@ void drawCursor() {
     }
     int x = START_X - CIRCLE_RADIUS + CIRCLE_X_SPACING * cursorX;
     int y = START_Y + CIRCLE_Y_SPACING * cursorY;
-    tft.drawRect(x - 3, y - CIRCLE_RADIUS - 3, 27, 27, TFT_NAVY);
-    tft.drawRect(x - 2, y - CIRCLE_RADIUS - 2, 25, 25, TFT_NAVY);
+    tft.drawRect(x - 3, y - CIRCLE_RADIUS - 3, 27, 27, TFT_MAROON);
+    tft.drawRect(x - 2, y - CIRCLE_RADIUS - 2, 25, 25, TFT_MAROON);
     lastX = cursorX;
     lastY = cursorY;
   }
