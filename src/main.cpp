@@ -31,13 +31,13 @@ TFT_OLIVE	0x7BE0	(128, 128, 0)
 #define LCD_RD A0  // Read
 
 // Піни для кнопок і джойстика
-#define GREEN_DOWN_PIN 22 //  analog  1
-#define BLUE_LEFT_PIN 25  // digital  9
-#define YELLOW_UP_PIN 23  // digital  8
-#define RED_RIGHT_PIN 24  // digital 12
+#define GREEN_DOWN_PIN 50 //  analog  1
+#define BLUE_LEFT_PIN 52  // digital  9
+#define YELLOW_UP_PIN 48  // digital  8
+#define RED_RIGHT_PIN 44  // digital 12
 #define Y_AXIS_PIN A14    //  analog  2
 #define X_AXIS_PIN A15    //  analog  3
-#define STICK_PIN 21      //  analog  0
+#define STICK_PIN 46      //  analog  0
 
 // Константи для графіки
 #define CIRCLE_RADIUS 10
@@ -58,7 +58,7 @@ int userGuess[4][9];   // Масив кіл: secretCode + 9 спроб грав�
 int cursorX = 0;       // Позиція курсору по X (0-3)
 int cursorY = 1;       // Позиція курсору по Y (1-9)
 unsigned long lastMoveTime = 0;
-const int moveDelay = 400;
+const int moveDelay = 300;
 
 void drawBoard();         // малювання ігрового поля
 void generateSecretCode();// генерування паролю
@@ -94,7 +94,7 @@ void loop() {
 
 // Малюємо ігрове поле
 void drawBoard() {
-  tft.fillScreen(TFT_CYAN);
+  tft.fillScreen(TFT_BLACK);
   tft.setCursor(0, 1);
   tft.setTextSize(2);
   tft.setTextColor(TFT_MAROON);
@@ -169,8 +169,8 @@ void drawCursor() {
     if (lastX != -1) {
       int oldX = START_X - CIRCLE_RADIUS + CIRCLE_X_SPACING * lastX;
       int oldY = START_Y + CIRCLE_Y_SPACING * lastY;
-      tft.drawRect(oldX - 3, oldY - CIRCLE_RADIUS - 3, 27, 27, TFT_CYAN);
-      tft.drawRect(oldX - 2, oldY - CIRCLE_RADIUS - 2, 25, 25, TFT_CYAN);
+      tft.drawRect(oldX - 3, oldY - CIRCLE_RADIUS - 3, 27, 27, TFT_BLACK);
+      tft.drawRect(oldX - 2, oldY - CIRCLE_RADIUS - 2, 25, 25, TFT_BLACK);
     }
     int x = START_X - CIRCLE_RADIUS + CIRCLE_X_SPACING * cursorX;
     int y = START_Y + CIRCLE_Y_SPACING * cursorY;
