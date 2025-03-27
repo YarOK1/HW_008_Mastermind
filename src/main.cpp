@@ -1,5 +1,5 @@
-#include <Adafruit_GFX.h>
 #include <Arduino.h> // Обов’язковий заголовок для PlatformIO
+#include <Adafruit_GFX.h>
 #include <MCUFRIEND_kbv.h>
 /*
 TFT_BLACK	0x0000	(0, 0, 0)
@@ -23,69 +23,77 @@ TFT_MAROON	0x7800	(128, 0, 0)
 TFT_OLIVE	0x7BE0	(128, 128, 0)
 */
 
-// Визначення пінів. Окрім вказаних нижче, підключена бібліотека використовує
-// цифрові піни від 2 до 9
+// Піни TFT. Окрім цих, підключена бібліотека використовує цифрові піни від 2 до 9
 #define LCD_RST A4 // Reset
 #define LCD_CS A3  // Chip Select
 #define LCD_RS A2  // Register Select (Data/Command)
 #define LCD_WR A1  // Write
 #define LCD_RD A0  // Read
 
-#define Green_Down_pin 22 //  analog  1
-#define Blue_Left_pin 25  // digital  9
-#define Yellow_Up_pin 23  // digital  8
-#define Red_Right_pin 24  // digital 12
-#define Y_axis_pin A14    //  analog  2
-#define X_axis_pin A15    //  analog  3
-#define Stick_pin 21      //  analog  0
-#define R 10
-#define Circle_Y_size 30
-#define Circle_X_size 30
-int Position_Y = 24;
-int Position_X = 15;
+// Піни для кнопок і джойстика
+#define GREEN_DOWN_PIN 22 //  analog  1
+#define BLUE_LEFT_PIN 25  // digital  9
+#define YELLOW_UP_PIN 23  // digital  8
+#define RED_RIGHT_PIN 24  // digital 12
+#define Y_AXIS_PIN A14    //  analog  2
+#define X_AXIS_PIN A15    //  analog  3
+#define STICK_PIN 21      //  analog  0
 
-int arrey_colors[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int you_arrey_colors[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+// Константи для графіки
+#define CIRCLE_RADIUS 10
+#define START_X 15          // Лівий відступ до центра першого кола секретного коду
+#define START_Y 15          // Верхній відступ до центра першого кола секретного коду
+#define HINT_X 132          // Лівий відступ до лівого верхнього квадратику підказок
+#define CIRCLE_X_SPACING 30 // Відступ між кружальцями по Х
+#define CIRCLE_Y_SPACING 30 // Відступ між кружальцями по Y
 
-// clang-format off
-int Position_Circle[4][10] = {
-  1, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0,
-  0, 0, 0, 0
+enum Color { // тип даних, який перераховує елементи і може присвоювати їм чисельні еквіваленти
+  NONE = 0, RED = 1, GREEN = 2, BLUE = 3, YELLOW = 4
 };
-// clang-format on
 
-// Ініціалізація об’єкта TFT
+// Глобальні змінні
 MCUFRIEND_kbv tft;
+int secretCode[4];     // Секретний код (4 кольори)
+int userGuess[4][9];   // Масив кіл: secretCode + 9 спроб гравця (10 рядків по 4 кольори)
+int cursorX = 0;       // Позиція курсору по X (0-3)
+int cursorY = 1;       // Позиція курсору по Y (1-9)
+unsigned long lastMoveTime = 0;
+const int moveDelay = 200;
 
-int i = 0;
-int j = 0;
+void drawBoard();         // малювання ігрового поля
+void generateSecretCode();// генерування паролю
+void handleInput();       // обробка сигналів вводу - дій гравця
+void setColor(int color); // встановлення кружальцям кольорів 
+void drawCursor();        // перемальовування курсору-квадратика
 
 void setup() {
   Serial.begin(9600);
-
   randomSeed(analogRead(0));
 
-  pinMode(Green_Down_pin, INPUT);
-  pinMode(Blue_Left_pin, INPUT);
-  pinMode(Yellow_Up_pin, INPUT);
-  pinMode(Red_Right_pin, INPUT);
-
-  pinMode(Y_axis_pin, INPUT);
-  pinMode(X_axis_pin, INPUT);
-  pinMode(Stick_pin, INPUT);
+  pinMode(GREEN_DOWN_PIN, INPUT);
+  pinMode(BLUE_LEFT_PIN, INPUT);
+  pinMode(YELLOW_UP_PIN, INPUT);
+  pinMode(RED_RIGHT_PIN, INPUT);
+  pinMode(X_AXIS_PIN, INPUT);
+  pinMode(Y_AXIS_PIN, INPUT);
+  pinMode(STICK_PIN, INPUT);
 
   // Ініціалізація екрану
   uint16_t ID = tft.readID(); // визначився як ID = 0x9341
   tft.begin(ID); // Запускаємо екран із визначеним ID
 
+ // Малюємо початковий екран
+ drawBoard();
+ generateSecretCode();
+}
+
+void loop() {
+  handleInput();
+  drawCursor();
+}
+
+// Малюємо ігрове поле
+void drawBoard() {
   tft.fillScreen(TFT_CYAN);
   tft.setCursor(0, 1);
   tft.setTextSize(2);
@@ -93,170 +101,82 @@ void setup() {
   tft.println("          Mastermind");
   tft.println("          by YarOK1");
 
-  // clang-format off
-  for (int j = 0; j < 4; j++) {
-    tft.fillCircle(Position_X + Circle_X_size * j, Position_Y, R, TFT_NAVY); // "закриті" кола паролю
-    for (int i = 1; i < 10; i++) {
-      tft.fillCircle(Position_X + Circle_X_size * j, Position_Y + Circle_Y_size * i, R, TFT_WHITE); // білі кола
-      tft.fillRect(Position_X - 8 + (Circle_X_size - 6) * j + 116, Position_Y - 9 + Circle_Y_size * i, 19, 19, TFT_NAVY); // fill-квадрати праворуч для оцінки вірності
+  // Секретний код (верхній ряд)
+  for (int i = 0; i < 4; i++) {
+    tft.fillCircle(START_X + CIRCLE_X_SPACING * i, START_Y, CIRCLE_RADIUS, TFT_NAVY);
+  }
+
+  // Поле для спроб (9 рядів)
+  for (int j = 1; j < 10; j++) {
+    for (int i = 0; i < 4; i++) {
+      tft.fillCircle(START_X + CIRCLE_X_SPACING * i, START_Y + CIRCLE_Y_SPACING * j, CIRCLE_RADIUS, TFT_WHITE);
+
+      // Квадратики підказок праворуч від кожного ряду
+      int hintX = HINT_X + CIRCLE_X_SPACING * i * 0.8;                  // X-координата верхнього лівого кута квадратиків підказок
+      int hintY = START_Y - CIRCLE_RADIUS + CIRCLE_Y_SPACING * j; // Y-координата верхнього лівого кута квадратиків підказок 
+      tft.fillRect(hintX, hintY, 20, 20, TFT_NAVY);
     }
   }
-  // clang-format on
 }
 
-void loop() {
-  for (int i = 0; i <= 11; i++) Serial.print(you_arrey_colors[i]);
+// Генеруємо секретний код
+void generateSecretCode() {
+  for (int i = 0; i < 4; i++) {
+    secretCode[i] = random(1, 5); // 1-4: RED, GREEN, BLUE, YELLOW
+  }
+}
 
-  int Blue_Left_state = digitalRead(Blue_Left_pin);
-  int Red_Right_state = digitalRead(Red_Right_pin);
-  int Yellow_Up_state = digitalRead(Yellow_Up_pin);
-  int Green_Down_state = digitalRead(Green_Down_pin);
+// Обробка вводу
+void handleInput() {
+  int xValue = analogRead(X_AXIS_PIN);
+  int yValue = analogRead(Y_AXIS_PIN);
+  unsigned long currentTime = millis();
 
-  int Stick_state = digitalRead(Stick_pin);
+  // Рух курсору джойстиком
+  if (currentTime - lastMoveTime >= moveDelay) {
+    if (xValue < 410 && cursorX < 3) cursorX++;
+    else if (xValue > 600 && cursorX > 0) cursorX--;
+    if (yValue < 410 && cursorY > 1) cursorY--;
+    else if (yValue > 600 && cursorY < 9) cursorY++;
+    lastMoveTime = currentTime;
+  }
 
-  int X_value = analogRead(X_axis_pin);
-  int Y_value = analogRead(Y_axis_pin);
+  // Вибір кольору кнопками
+  if (digitalRead(RED_RIGHT_PIN) == LOW) setColor(RED);
+  if (digitalRead(GREEN_DOWN_PIN) == LOW) setColor(GREEN);
+  if (digitalRead(BLUE_LEFT_PIN) == LOW) setColor(BLUE);
+  if (digitalRead(YELLOW_UP_PIN) == LOW) setColor(YELLOW);
+}
 
-    for (int i = 0; i <= 4; i++) {
-    int a = random(1, 5);
+// Встановлюємо колір
+void setColor(int color) {
+  userGuess[cursorX][cursorY] = color;
+  int x = START_X + CIRCLE_X_SPACING * cursorX;
+  int y = START_Y + CIRCLE_Y_SPACING * cursorY;
+  switch (color) {
+    case RED:    tft.fillCircle(x, y, CIRCLE_RADIUS, TFT_RED); break;
+    case GREEN:  tft.fillCircle(x, y, CIRCLE_RADIUS, TFT_GREEN); break;
+    case BLUE:   tft.fillCircle(x, y, CIRCLE_RADIUS, TFT_BLUE); break;
+    case YELLOW: tft.fillCircle(x, y, CIRCLE_RADIUS, TFT_YELLOW); break;
+  }
+  delay(200);
+}
 
-    if (a == 1) {
-      arrey_colors[0] = 255;
-      arrey_colors[1] = 0;
-      arrey_colors[2] = 0;
-    } else if (a == 2) {
-      arrey_colors[3] = 0;
-      arrey_colors[4] = 255;
-      arrey_colors[5] = 0;
-    } else if (a == 3) {
-      arrey_colors[6] = 0;
-      arrey_colors[7] = 0;
-      arrey_colors[8] = 255;
-    } else if (a == 4) {
-      arrey_colors[9] = 255;
-      arrey_colors[10] = 191;
-      arrey_colors[11] = 0;
+// Малюємо курсор
+void drawCursor() {
+  static int lastX = -1, lastY = -1;
+  if (lastX != cursorX || lastY != cursorY) {
+    if (lastX != -1) {
+      int oldX = START_X - CIRCLE_RADIUS + CIRCLE_X_SPACING * lastX;
+      int oldY = START_Y + CIRCLE_Y_SPACING * lastY;
+      tft.drawRect(oldX - 3, oldY - CIRCLE_RADIUS - 3, 27, 27, TFT_CYAN);
+      tft.drawRect(oldX - 2, oldY - CIRCLE_RADIUS - 2, 25, 25, TFT_CYAN);
     }
+    int x = START_X - CIRCLE_RADIUS + CIRCLE_X_SPACING * cursorX;
+    int y = START_Y + CIRCLE_Y_SPACING * cursorY;
+    tft.drawRect(x - 3, y - CIRCLE_RADIUS - 3, 27, 27, TFT_NAVY);
+    tft.drawRect(x - 2, y - CIRCLE_RADIUS - 2, 25, 25, TFT_NAVY);
+    lastX = cursorX;
+    lastY = cursorY;
   }
-
-  for (int i = 0; i <= 12; i++) {
-    Serial.print(arrey_colors[i]);
-  }
-  
-  tft.drawRect(5 + 30 * i, Circle_Y_size + 13, 21, 22, TFT_CYAN); // подвійний квадрат довкола білих кіл
-  tft.drawRect(4 + 30 * i, Position_Y + 18, 23, 24, TFT_CYAN); // подвійний квадрат довкола білих кіл
-
-    if (X_value < 410 and i < 3) {
-    i++;
-    }
-    if (X_value > 600 and i > 0) {
-    i--;
-    }
-
-  // clang-format off
-  tft.drawRect(5 + 30 * i, Circle_Y_size + 13, 21, 22, TFT_NAVY); // подвійний квадрат довкола білих кіл
-  tft.drawRect(4 + 30 * i, Position_Y + 18, 23, 24, TFT_NAVY); // подвійний квадрат довкола білих кіл
-  // clang-format on
-  
-  if (Blue_Left_state == 0) {
-  tft.fillCircle(Position_X + 30 * i, Position_Y + Circle_Y_size, R, TFT_BLUE);
-  switch (i) {
-  case 0:
-  you_arrey_colors[0] = 0;
-  you_arrey_colors[1] = 0;
-  you_arrey_colors[2] = 255;
-  break;
-  case 1:
-  you_arrey_colors[3] = 0;
-  you_arrey_colors[4] = 0;
-  you_arrey_colors[5] = 255;
-  break;
-  case 2:
-  you_arrey_colors[6] = 0;
-  you_arrey_colors[7] = 0;
-  you_arrey_colors[8] = 255;
-  break;
-  case 3:
-  you_arrey_colors[9] = 0;
-  you_arrey_colors[10] = 0;
-  you_arrey_colors[11] = 255;
-  break;
-  }
-  }
-  if (Green_Down_state == 0) {
-  tft.fillCircle(Position_X + 30 * i, Position_Y + Circle_Y_size, R, TFT_GREEN);
-  switch (i) {
-    case 0:
-    you_arrey_colors[0] = 0;
-    you_arrey_colors[1] = 255;
-    you_arrey_colors[2] = 0;
-    break;
-    case 1:
-    you_arrey_colors[3] = 0;
-    you_arrey_colors[4] = 255;
-    you_arrey_colors[5] = 0;
-    break;
-    case 2:
-    you_arrey_colors[6] = 0;
-    you_arrey_colors[7] = 255;
-    you_arrey_colors[8] = 0;
-    break;
-    case 3:
-    you_arrey_colors[9] = 0;
-    you_arrey_colors[10] = 255;
-    you_arrey_colors[11] = 0;
-    break;
-    }
-  }
-  if (Red_Right_state == 0) {
-  tft.fillCircle(Position_X + 30 * i, Position_Y + Circle_Y_size, R, TFT_RED);
-  switch (i) {
-    case 0:
-    you_arrey_colors[0] = 255;
-    you_arrey_colors[1] = 0;
-    you_arrey_colors[2] = 0;
-    break;
-    case 1:
-    you_arrey_colors[3] = 255;
-    you_arrey_colors[4] = 0;
-    you_arrey_colors[5] = 0;
-    break;
-    case 2:
-    you_arrey_colors[6] = 255;
-    you_arrey_colors[7] = 0;
-    you_arrey_colors[8] = 0;
-    break;
-    case 3:
-    you_arrey_colors[9] = 255;
-    you_arrey_colors[10] = 0;
-    you_arrey_colors[11] = 0;
-    break;
-    }
-  }
-  if (Yellow_Up_state == 0) {
-  tft.fillCircle(Position_X + 30 * i, Position_Y + Circle_Y_size, R, TFT_YELLOW);
-  switch (i) {
-    case 0:
-    you_arrey_colors[0] = 255;
-    you_arrey_colors[1] = 191;
-    you_arrey_colors[2] = 0;
-    break;
-    case 1:
-    you_arrey_colors[3] = 255;
-    you_arrey_colors[4] = 191;
-    you_arrey_colors[5] = 0;
-    break;
-    case 2:
-    you_arrey_colors[6] = 255;
-    you_arrey_colors[7] = 191;
-    you_arrey_colors[8] = 0;
-    break;
-    case 3:
-    you_arrey_colors[9] = 255;
-    you_arrey_colors[10] = 191;
-    you_arrey_colors[11] = 0;
-    break;
-    }
-  }
-  delay(1000);
 }
